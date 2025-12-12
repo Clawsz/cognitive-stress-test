@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Double Decision Pro v2 — Fixed Click Detection</title>
+<style>
+  :root{--bg:#0b0d1a;--panel:#11142a;--text:#e7eaff;--muted:#aab3ff;--line:#252a66;--ok:#7ef7c9;--warn:#ffd36e;--bad:#ff8a8a;--accent:#8aa1ff;}
+  *{box-sizing:border-box}
+  body{margin:0;background:#0b0d1a;color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
+  .wrap{max-width:min(1120px,96vw);margin:18px auto 28px}
+  header{display:flex;justify-content:space-between;align-items:center;gap:10px;background:#0f122e;border:1px solid var(--line);border-radius:16px;padding:12px 14px}
+  .btn,select,input[type=number],label.opt{background:#14183a;border:1px solid #2b2f63;color:var(--text);border-radius:10px;padding:8px 10px}
+  .stage{position:relative;height:560px;border:1px solid var(--line);border-radius:16px;background:#0a0c1b;overflow:hidden;margin-top:10px}
+  .pill{display:inline-block;background:#14183a;border:1px solid #2b2f63;border-radius:999px;padding:6px 10px;margin:6px 6px 0 0}
+  .overlay{position:absolute;inset:0;display:grid;place-items:center;color:#cfd6ffaa;text-align:center;pointer-events:none}
+  .modal{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;padding:20px}
+  .card{background:#0f122e;border:1px solid var(--line);border-radius:16px;max-width:min(860px,96vw);width:100%;padding:18px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div><b>Double Decision Pro v2</b><div style="color:#aab3ff">Bugfix: circle left-click detection + clearer target</div></div>
+  <div>
+    <select id="durSel"><option>30</option><option selected>60</option><option>120</option></select>
+    <input id="timeoutMs" type="number" value="1500" step="50" min="400" max="3000" title="Base timeout (ms)">
+    <label class="opt"><input id="adaptive" type="checkbox" checked> Adaptive</label>
+    <label class="opt"><input id="audio" type="checkbox" checked> Audio</label>
+    <label class="opt"><input id="hard" type="checkbox"> Hard</label>
+    <label class="opt"><input id="twoBtn" type="checkbox"> Two-button (Triangle = Right Click)</label>
+    <button class="btn" id="startBtn">Start</button>
+    <button class="btn" id="resetBtn">Reset</button>
+  </div>
+</header>
+<div class="pill">Time: <span id="time">0</span>s</div>
+<div class="pill">Correct: <span id="correct">0</span></div>
+<div class="pill">Errors: <span id="errors">0</span></div>
+<div class="pill">Accuracy: <span id="acc">—</span></div>
+<div class="pill">RT avg/med/95th: <span id="rtTriplet">—</span></div>
+<div class="pill">Streak: <span id="streak">0</span></div>
+<div class="pill">Timeout: <span id="toView">—</span> ms</div>
+
+<section class="stage" id="stage">
+  <canvas id="game"></canvas>
+  <div class="overlay" id="overlay">Press <b>Start</b> • Click circles • Press <b>Space</b> (or Right Click) for triangles</div>
+</section>
+</div>
+
+<div class="modal" id="modal"><div class="card">
+  <h3>Session Summary</h3>
+  <div id="sumMeta" style="margin-bottom:10px"></div>
+  <canvas id="summaryGraph" width="720" height="220" style="width:100%;height:220px"></canvas>
+  <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap">
+    <button class="btn" id="restartBtn">Restart</button>
+    <button class="btn" id="closeBtn">Close</button>
+    <button class="btn" id="csvBtn">Export CSV</button>
+  </div>
+</div></div>
+
+<script>
+(function(){
+  const cv=document.getElementById('game'), ctx=cv.getContext('2d');
+  const stg=document.getElementById('stage'), ov=document.getElementById('overlay');
+  const timeEl=document.getElementById('time'), correctEl=document.getElementById('correct'), errorsEl=document.getElementById('errors'),
+        accEl=document.getElementById('acc'), rtTripletEl=document.getElementById('rtTriplet'),
+        streakEl=document.getElementById('streak'), toView=document.getElementById('toView');
+  const durSel=document.getElementById('durSel'), timeoutMs=document.getElementById('timeoutMs');
+  const adaptive=document.getElementById('adaptive'), audio=document.getElementById('audio'),
+        hard=document.getElementById('hard'), twoBtn=document.getElementById('twoBtn');
+  const startBtn=document.getElementById('startBtn'), resetBtn=document.getElementById('resetBtn');
+  const modal=document.getElementById('modal'), sumMeta=document.getElementById('sumMeta'),
+        summaryGraph=document.getElementById('summaryGraph'), gx=summaryGraph.getContext('2d');
+  const restartBtn=document.getElementById('restartBtn'), closeBtn=document.getElementById('closeBtn'), csvBtn=document.getElementById('csvBtn');
+
+  function rs(){const r=stg.getBoundingClientRect();cv.width=r.width;cv.height=r.height;} new ResizeObserver(rs).observe(stg); rs();
+
+  // Audio
+  let AC, beepC, beepT;
+  function initAudio(){
+    if(AC) return;
+    try{
+      AC = new (window.AudioContext||window.webkitAudioContext)();
+      beepC=(d=0.08)=>{const o=AC.createOscillator(), g=AC.createGain(); o.type='sine'; o.frequency.value=660; g.gain.value=0.06; o.connect(g).connect(AC.destination); const t=AC.currentTime; o.start(t); o.stop(t+d);};
+      beepT=(d=0.08)=>{const o=AC.createOscillator(), g=AC.createGain(); o.type='square'; o.frequency.value=440; g.gain.value=0.06; o.connect(g).connect(AC.destination); const t=AC.currentTime; o.start(t); o.stop(t+d);};
+    }catch(e){}
+  }
+
+  let st=reset();
+  function reset(){return{run:false,start:0,end:0,now:0,last:0,prompt:null,at:0,dl:0,baseTo:1500,curTo:1500,correct:0,errors:0,attempts:0,streak:0,rts:[],samples:[],distractors:[],flash:null};}
+
+  function start(){st=reset();st.run=true;st.baseTo=+timeoutMs.value;st.curTo=st.baseTo;st.start=performance.now();st.end=st.start+ +durSel.value*1000;st.now=st.last=st.start;ov.textContent='Go!';spawn();requestAnimationFrame(loop);}
+  function stop(){st.run=false;ov.textContent='Done';showSummary();}
+
+  function loop(ts){if(!st.run)return;st.now=ts;timeEl.textContent=Math.max(0,Math.ceil((st.end-ts)/1000));
+    if(st.samples.length===0||ts-st.samples[st.samples.length-1].t>=1000) st.samples.push({t:ts,correct:st.correct});
+    if(st.prompt&&ts>st.dl){st.attempts++;st.errors++;st.streak=0;adapt(false);spawn();}
+    draw(); if(ts>=st.end){stop();return;} requestAnimationFrame(loop);
+  }
+
+  function adapt(hit){ if(!adaptive.checked) return; const acc = st.attempts ? st.correct/st.attempts : 0.85; const err = 0.85-acc; st.curTo = Math.max(400, Math.min(2500, st.curTo + err*250)); toView.textContent = Math.round(st.curTo); }
+
+  function spawn(){
+    st.distractors=[];
+    if(hard.checked){ const n=2+Math.floor(Math.random()*3); for(let i=0;i<n;i++){ st.distractors.push({k:Math.random()<.5?'circle':'triangle',x:40+Math.random()*(cv.width-80),y:40+Math.random()*(cv.height-80)}); } }
+    const k = Math.random()<.5?'circle':'triangle', x=80+Math.random()*(cv.width-160), y=80+Math.random()*(cv.height-160);
+    st.prompt={k,x,y}; st.at=performance.now(); st.dl=st.at+st.curTo; toView.textContent=Math.round(st.curTo);
+    if(audio.checked){initAudio(); (k==='circle'?beepC:beepT)();}
+  }
+
+  // Prevent context menu for right-click testing
+  stg.addEventListener('contextmenu', e=>e.preventDefault());
+
+  // Robust click detection: treat e.button===0 (or e.which===1) as left
+  stg.addEventListener('mousedown', e=>{
+    if(!st.run||!st.prompt)return;
+    const r=cv.getBoundingClientRect();
+    const mx=e.clientX-r.left, my=e.clientY-r.top;
+    const left = (e.button===0) || (e.which===1);
+    const right = (e.button===2);
+    st.attempts++;
+
+    // Hit test with tolerance
+    const targetRadius = 32, tol = 2; // +2px tolerance
+    let ok=false;
+    if(st.prompt.k==='circle'){
+      const d = Math.hypot(mx-st.prompt.x, my-st.prompt.y);
+      ok = left && d <= (targetRadius + tol);
+    } else {
+      ok = twoBtn.checked ? right : false; // triangle: right-click if twoBtn, else Space
+    }
+    st.flash = {x: mx, y: my, good: ok, until: performance.now() + 120};
+    finalize(ok);
+  });
+
+  window.addEventListener('keydown', e=>{
+    if(!st.run||!st.prompt)return;
+    if(e.key===' '||e.code==='Space'){
+      st.attempts++;
+      const ok=(st.prompt.k==='triangle')&&!twoBtn.checked;
+      st.flash = {x: st.prompt.x, y: st.prompt.y, good: ok, until: performance.now() + 120};
+      finalize(ok);
+    }
+  });
+
+  function finalize(ok){
+    if(ok){ st.rts.push(performance.now()-st.at); st.correct++; st.streak++; adapt(true); }
+    else { st.errors++; st.streak=0; adapt(false); }
+    if(audio.checked){initAudio(); (ok?beepC:beepT)(0.05);}
+    spawn(); hud();
+  }
+
+  function hud(){ correctEl.textContent=st.correct; errorsEl.textContent=st.errors; streakEl.textContent=st.streak;
+    accEl.textContent = st.attempts ? (st.correct/st.attempts*100).toFixed(1)+'%' : '—';
+    if(st.rts.length){ const a=avg(st.rts), m=med(st.rts), p=pct(st.rts,.95); rtTripletEl.textContent=`${a.toFixed(1)} / ${m.toFixed(1)} / ${p.toFixed(1)} ms`; } else { rtTripletEl.textContent='—'; }
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,cv.width,cv.height);
+    // distractors
+    for(const d of st.distractors){
+      if(d.k==='circle'){ ctx.beginPath(); ctx.arc(d.x,d.y,24,0,Math.PI*2); ctx.fillStyle='#2b2f63aa'; ctx.fill(); }
+      else { ctx.beginPath(); ctx.moveTo(d.x,d.y-28); ctx.lineTo(d.x-24,d.y+22); ctx.lineTo(d.x+24,d.y+22); ctx.closePath(); ctx.fillStyle='#2b2f63aa'; ctx.fill(); }
+    }
+    // main prompt with clearer visuals
+    if(st.prompt){
+      if(st.prompt.k==='circle'){
+        ctx.beginPath(); ctx.arc(st.prompt.x,st.prompt.y,32,0,Math.PI*2);
+        ctx.fillStyle='#6ad0ffaa'; ctx.fill();
+        ctx.lineWidth=3; ctx.strokeStyle='#ffffffee'; ctx.stroke();
+        ctx.fillStyle='#aab3ff'; ctx.font='16px system-ui';
+        ctx.fillText(twoBtn.checked ? 'Left-click TARGET circle' : 'Click TARGET circle', 12, 24);
+        // small target label
+        ctx.fillStyle='#ffffffcc'; ctx.font='12px system-ui'; ctx.fillText('TARGET', st.prompt.x-24, st.prompt.y-40);
+      } else {
+        ctx.beginPath(); ctx.moveTo(st.prompt.x,st.prompt.y-36); ctx.lineTo(st.prompt.x-32,st.prompt.y+28); ctx.lineTo(st.prompt.x+32,st.prompt.y+28); ctx.closePath();
+        ctx.fillStyle='#ff8ac1aa'; ctx.fill(); ctx.lineWidth=3; ctx.strokeStyle='#ffffffee'; ctx.stroke();
+        ctx.fillStyle='#aab3ff'; ctx.font='16px system-ui';
+        ctx.fillText(twoBtn.checked ? 'Right-click triangle' : 'Press SPACE for triangle', 12, 24);
+      }
+      // timeout bar
+      const total=st.dl-st.at, left=Math.max(0,st.dl-performance.now()), w=Math.max(0,Math.min(1,left/total))*(cv.width-40);
+      ctx.fillStyle='#2b2f63'; ctx.fillRect(20,cv.height-24,cv.width-40,8);
+      ctx.fillStyle = left>total*.33 ? '#8aa1ff' : (left>total*.15 ? '#ffd36e' : '#ff8a8a'); ctx.fillRect(20,cv.height-24,w,8);
+    }
+    // click flash (debug)
+    if(st.flash && performance.now() < st.flash.until){
+      ctx.beginPath(); ctx.arc(st.flash.x, st.flash.y, 10, 0, Math.PI*2);
+      ctx.strokeStyle = st.flash.good ? '#7ef7c9' : '#ff8a8a'; ctx.lineWidth = 3; ctx.stroke();
+    }
+  }
+
+  function showSummary(){
+    hud();
+    const dur=Math.round((st.end-st.start)/1000);
+    const acc=st.attempts?(st.correct/st.attempts*100):0;
+    const rt=st.rts.length? `${avg(st.rts).toFixed(1)} / ${med(st.rts).toFixed(1)} / ${pct(st.rts,.95).toFixed(1)} ms` : '—';
+    sumMeta.innerHTML=`<div><b>Duration:</b> ${dur}s</div><div><b>Correct:</b> ${st.correct}</div><div><b>Errors:</b> ${st.errors}</div><div><b>Accuracy:</b> ${acc.toFixed(1)}%</div><div><b>RT avg/med/95th:</b> ${rt}</div><div><b>Final Timeout:</b> ${Math.round(st.curTo)} ms ${adaptive.checked?'(adaptive)':''}</div><div><b>Modes:</b> ${audio.checked?'Audio ✓':'Audio ×'} • ${hard.checked?'Hard ✓':'Hard ×'} • ${twoBtn.checked?'Two-button ✓':'Two-button ×'}</div>`;
+    drawGraph(); modal.style.display='flex';
+  }
+
+  function drawGraph(){
+    const W=summaryGraph.width,H=summaryGraph.height; gx.clearRect(0,0,W,H);
+    gx.strokeStyle='#2b2f63'; gx.beginPath(); gx.moveTo(30,10); gx.lineTo(30,H-20); gx.lineTo(W-10,H-20); gx.stroke();
+    gx.fillStyle='#aab3ff'; gx.font='12px system-ui';
+    if(st.samples.length<2){ gx.fillText('Not enough data',40,40); return; }
+    const baseT=st.samples[0].t, secs=st.samples.map(s=>(s.t-baseT)/1000|0), perSec=[];
+    for(let i=1;i<st.samples.length;i++){ const sec=secs[i], d=st.samples[i].correct-st.samples[i-1].correct; perSec[sec]=(perSec[sec]||0)+Math.max(0,d); }
+    const vals=perSec.map(v=>v||0), maxY=Math.max(1,...vals);
+    for(let i=0;i<=4;i++){ const yv=Math.round(i*maxY/4), y=(H-20)-(i*(H-30)/4); gx.globalAlpha=.15; gx.beginPath(); gx.moveTo(30,y); gx.lineTo(W-10,y); gx.stroke(); gx.globalAlpha=1; gx.fillText(String(yv),6,y+4); }
+    gx.beginPath(); for(let i=0;i<vals.length;i++){ const x=30+i*((W-40)/Math.max(1,vals.length-1)), y=(H-20)-(vals[i]/maxY)*(H-30); if(i===0)gx.moveTo(x,y); else gx.lineTo(x,y);} gx.strokeStyle='#8aa1ff'; gx.lineWidth=2; gx.stroke();
+    for(let i=0;i<vals.length;i++){ const x=30+i*((W-40)/Math.max(1, vals.length-1)), y=(H-20)-(vals[i]/maxY)*(H-30); gx.beginPath(); gx.arc(x,y,3,0,Math.PI*2); gx.fillStyle='#7ef7c9'; gx.fill(); }
+  }
+
+  csvBtn.addEventListener('click',()=>{
+    const rows=[['Second','Correct cumulative']];
+    const baseT=st.samples[0]?.t||performance.now();
+    for(const s of st.samples){ rows.push([Math.round((s.t-baseT)/1000), s.correct]); }
+    const csv=rows.map(r=>r.join(',')).join('\\n'); const b=new Blob([csv],{type:'text/csv'});
+    const u=URL.createObjectURL(b); const a=document.createElement('a'); a.href=u; a.download='double_decision_pro_v2_summary.csv'; a.click(); URL.revokeObjectURL(u);
+  });
+
+  restartBtn.addEventListener('click',()=>{ modal.style.display='none'; start(); });
+  closeBtn.addEventListener('click',()=>{ modal.style.display='none'; });
+  startBtn.addEventListener('click', start);
+  resetBtn.addEventListener('click', ()=>{ st=reset(); ov.textContent='Press Start • Click circles • Press Space (or Right Click) for triangles'; ctx.clearRect(0,0,cv.width,cv.height); toView.textContent='—'; });
+
+  function avg(a){return a.reduce((s,v)=>s+v,0)/a.length;} function med(a){const b=[...a].sort((x,y)=>x-y); const i=Math.floor(b.length/2); return b.length%2?b[i]:(b[i-1]+b[i])/2;} function pct(a,p){const b=[...a].sort((x,y)=>x-y); const i=Math.min(b.length-1,Math.max(0,Math.floor(p*(b.length-1)))); return b[i];}
+})();
+</script>
+</body>
+</html>

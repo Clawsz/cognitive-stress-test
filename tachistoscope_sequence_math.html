@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Tachistoscope Sequence Math</title>
+  <style>
+    :root {
+      --bg: #020617;
+      --bg-card: #020617;
+      --accent: #38bdf8;
+      --accent2: #a855f7;
+      --text-main: #e5e7eb;
+      --text-muted: #9ca3af;
+      --danger: #ef4444;
+      --success: #22c55e;
+    }
+
+    * {
+      box-sizing: border-box;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: radial-gradient(circle at top, #1e293b 0, #020617 45%, #000 100%);
+      color: var(--text-main);
+    }
+
+    .app {
+      width: 100%;
+      max-width: 900px;
+      padding: 24px 26px 20px;
+      border-radius: 20px;
+      background: radial-gradient(circle at top left, rgba(56, 189, 248, 0.18), transparent 55%),
+                  radial-gradient(circle at bottom right, rgba(168, 85, 247, 0.18), transparent 55%),
+                  #020617;
+      box-shadow:
+        0 24px 60px rgba(15, 23, 42, 0.9),
+        0 0 0 1px rgba(148, 163, 184, 0.25);
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .subtitle {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-top: 3px;
+    }
+
+    .pill {
+      font-size: 0.75rem;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.5);
+      background: rgba(15, 23, 42, 0.9);
+      color: var(--accent);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 2.1fr) minmax(0, 1.3fr);
+      gap: 18px;
+    }
+
+    @media (max-width: 820px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      border-radius: 16px;
+      padding: 18px 18px 14px;
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid rgba(148, 163, 184, 0.35);
+    }
+
+    .display {
+      height: 190px;
+      border-radius: 14px;
+      background: radial-gradient(circle at center, rgba(248, 250, 252, 0.06), transparent 55%),
+                  #020617;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .fixation {
+      position: absolute;
+      width: 4px;
+      height: 4px;
+      border-radius: 999px;
+      background: rgba(148, 163, 184, 0.8);
+    }
+
+    .stimulus {
+      font-size: 2.3rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-shadow:
+        0 0 18px rgba(15, 23, 42, 0.95),
+        0 0 30px rgba(56, 189, 248, 0.55);
+    }
+
+    .sequence-indicator {
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      opacity: 0.85;
+    }
+
+    .question {
+      margin-top: 12px;
+      min-height: 46px;
+      font-size: 0.96rem;
+    }
+
+    .question span.label {
+      display: block;
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .controls-row {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-top: 8px;
+    }
+
+    button {
+      border-radius: 999px;
+      border: none;
+      padding: 8px 16px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      background: linear-gradient(135deg, #38bdf8, #a855f7);
+      color: #f9fafb;
+      box-shadow: 0 10px 22px rgba(56, 189, 248, 0.55);
+      transition: transform 0.08s ease, box-shadow 0.08s ease, opacity 0.1s ease;
+    }
+
+    button.secondary {
+      background: transparent;
+      border: 1px solid rgba(148, 163, 184, 0.75);
+      box-shadow: none;
+      color: var(--text-main);
+      padding-inline: 14px;
+    }
+
+    button:disabled {
+      opacity: 0.4;
+      cursor: default;
+      box-shadow: none;
+      transform: none;
+    }
+
+    button:not(:disabled):active {
+      transform: translateY(1px) scale(0.99);
+      box-shadow: 0 6px 14px rgba(56, 189, 248, 0.5);
+    }
+
+    input[type="text"], input[type="number"], select {
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.75);
+      background: rgba(15, 23, 42, 0.98);
+      color: var(--text-main);
+      font-size: 0.9rem;
+      padding: 7px 11px;
+      outline: none;
+    }
+
+    input[type="text"] {
+      flex: 1;
+    }
+
+    input:focus, select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.5);
+    }
+
+    label.control-label {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    label.control-label input,
+    label.control-label select {
+      margin-top: 1px;
+      font-size: 0.78rem;
+      width: 90px;
+    }
+
+    label.control-label.small input {
+      width: 70px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.7);
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+
+    .feedback {
+      font-size: 0.9rem;
+      margin-top: 4px;
+    }
+
+    .feedback.correct {
+      color: var(--success);
+    }
+
+    .feedback.incorrect {
+      color: var(--danger);
+    }
+
+    .stats-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      margin-top: 10px;
+      margin-bottom: 4px;
+    }
+
+    .hint {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+      font-size: 0.82rem;
+    }
+
+    @media (max-width: 540px) {
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .stat {
+      padding: 7px 9px;
+      border-radius: 11px;
+      background: rgba(15, 23, 42, 0.96);
+      border: 1px solid rgba(55, 65, 81, 0.9);
+    }
+
+    .stat-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--text-muted);
+      margin-bottom: 2px;
+    }
+
+    .stat-value {
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+
+    .stat-value.good {
+      color: var(--success);
+    }
+
+    .stat-value.bad {
+      color: var(--danger);
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="header">
+      <div>
+        <div class="title">Sequence Tachistoscope</div>
+        <div class="subtitle">
+          Flash a chain like <b>7 + 3 × 2 − 4</b> one symbol at a time. Hold it in working memory. Compute the final result.
+        </div>
+      </div>
+      <div class="pill">Mode: Sequence Math</div>
+    </div>
+
+    <div class="layout">
+      <!-- LEFT: main game -->
+      <div class="card">
+        <div class="display" id="display">
+          <div class="fixation"></div>
+          <div class="stimulus" id="stimulus"></div>
+          <div class="sequence-indicator" id="seqIndicator"></div>
+        </div>
+
+        <div class="question">
+          <span class="label">Prompt</span>
+          <span id="questionText">
+            Press <b>Start</b>. A full arithmetic chain will flash symbol by symbol. After the last flash, type the final answer.
+          </span>
+        </div>
+
+        <div class="input-row">
+          <input id="answerInput" type="text" placeholder="Type final result and hit Enter" autocomplete="off" disabled />
+          <button id="submitBtn" disabled>Submit</button>
+        </div>
+        <div class="feedback" id="feedback"></div>
+
+        <div class="controls-row" style="margin-top:12px;">
+          <button id="startBtn">Start</button>
+          <button id="skipBtn" class="secondary" disabled>Skip</button>
+          <span class="badge"><span class="dot"></span> Press <b>Enter</b> to submit faster</span>
+        </div>
+      </div>
+
+      <!-- RIGHT: settings + stats -->
+      <div class="card">
+        <div style="font-size:0.95rem;font-weight:600;margin-bottom:6px;">Session Settings</div>
+        <div class="controls-row">
+          <label class="control-label small">
+            Flash (ms)
+            <input id="flashInput" type="number" value="140" min="60" max="800" />
+          </label>
+          <label class="control-label small">
+            Gap (ms)
+            <input id="gapInput" type="number" value="90" min="40" max="800" />
+          </label>
+          <label class="control-label small">
+            Length
+            <select id="lengthSelect">
+              <option value="3">3 ops</option>
+              <option value="4" selected>4 ops</option>
+              <option value="5">5 ops</option>
+            </select>
+          </label>
+          <label class="control-label small">
+            Time limit (s)
+            <input id="limitInput" type="number" value="10" min="3" max="40" />
+          </label>
+        </div>
+        <div class="hint">
+          All operations follow normal math order: × before ÷ before +/−. Answers are integers only (no decimals).
+        </div>
+
+        <div class="stats-title">Stats (this session)</div>
+        <div class="stats-grid">
+          <div class="stat">
+            <div class="stat-label">Problems</div>
+            <div class="stat-value"><span id="statTotal">0</span> total</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Accuracy</div>
+            <div class="stat-value" id="statAccuracy">–</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Avg answer time</div>
+            <div class="stat-value" id="statAvgTime">–</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Streak</div>
+            <div class="stat-value" id="statStreak">0</div>
+          </div>
+        </div>
+
+        <button id="resetBtn" class="secondary" style="margin-top:10px;">Reset stats</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // -------- Utility --------
+    function randomChoice(arr) {
+      return arr[Math.floor(Math.random() * arr.length)];
+    }
+    function randomInt(min, max) {
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    // -------- Expression generation --------
+    function generateSequence(numOps) {
+      // Build expression as alternating number / operator / number / ...
+      // Use +, -, ×, ÷ but pick ÷ carefully to keep integer.
+      let tokens = [];
+      let value = randomInt(2, 9);
+      tokens.push(String(value));
+
+      const opsPool = ["+", "-", "×", "÷"];
+
+      for (let i = 0; i < numOps; i++) {
+        let op;
+        if (i === 0) {
+          // first op can be anything
+          op = randomChoice(opsPool);
+        } else {
+          // avoid too many ÷ in a row
+          const lastOp = tokens[tokens.length - 1];
+          if (lastOp === "÷") {
+            op = randomChoice(["+", "-", "×"]);
+          } else {
+            op = randomChoice(opsPool);
+          }
+        }
+
+        let next;
+        if (op === "÷") {
+          // choose a divisor that divides current value
+          const divisors = [];
+          for (let d = 2; d <= 9; d++) {
+            if (value % d === 0) divisors.push(d);
+          }
+          if (divisors.length === 0) {
+            // fallback: switch to ×
+            op = "×";
+            next = randomInt(2, 9);
+            value = value * next;
+          } else {
+            next = randomChoice(divisors);
+            value = value / next;
+          }
+        } else if (op === "×") {
+          next = randomInt(2, 9);
+          value = value * next;
+        } else if (op === "+") {
+          next = randomInt(1, 15);
+          value = value + next;
+        } else { // "-"
+          next = randomInt(1, 15);
+          value = value - next;
+        }
+
+        tokens.push(op);
+        tokens.push(String(next));
+      }
+
+      const result = value;
+      return { tokens, result };
+    }
+
+    // -------- DOM refs --------
+    const stimulusEl = document.getElementById("stimulus");
+    const seqIndicatorEl = document.getElementById("seqIndicator");
+    const questionTextEl = document.getElementById("questionText");
+    const answerInput = document.getElementById("answerInput");
+    const feedbackEl = document.getElementById("feedback");
+
+    const flashInput = document.getElementById("flashInput");
+    const gapInput = document.getElementById("gapInput");
+    const lengthSelect = document.getElementById("lengthSelect");
+    const limitInput = document.getElementById("limitInput");
+
+    const startBtn = document.getElementById("startBtn");
+    const submitBtn = document.getElementById("submitBtn");
+    const skipBtn = document.getElementById("skipBtn");
+    const resetBtn = document.getElementById("resetBtn");
+
+    const statTotalEl = document.getElementById("statTotal");
+    const statAccuracyEl = document.getElementById("statAccuracy");
+    const statAvgTimeEl = document.getElementById("statAvgTime");
+    const statStreakEl = document.getElementById("statStreak");
+
+    // -------- State --------
+    let current = null;
+    let sequenceTimeout = null;
+    let limitTimeout = null;
+    let awaitingAnswer = false;
+    let problemStartTime = null;
+
+    let stats = {
+      total: 0,
+      correct: 0,
+      sumTime: 0,
+      streak: 0
+    };
+
+    function getFlashDuration() {
+      let v = parseInt(flashInput.value, 10);
+      if (isNaN(v) || v < 60) v = 60;
+      if (v > 800) v = 800;
+      return v;
+    }
+    function getGapDuration() {
+      let v = parseInt(gapInput.value, 10);
+      if (isNaN(v) || v < 40) v = 40;
+      if (v > 800) v = 800;
+      return v;
+    }
+    function getTimeLimit() {
+      let v = parseFloat(limitInput.value);
+      if (isNaN(v) || v < 3) v = 3;
+      if (v > 40) v = 40;
+      return v;
+    }
+
+    function setConfigEnabled(enabled) {
+      flashInput.disabled = !enabled;
+      gapInput.disabled = !enabled;
+      lengthSelect.disabled = !enabled;
+      limitInput.disabled = !enabled;
+    }
+
+    function updateStatsUI() {
+      statTotalEl.textContent = stats.total;
+      if (stats.total === 0) {
+        statAccuracyEl.textContent = "–";
+        statAccuracyEl.className = "stat-value";
+        statAvgTimeEl.textContent = "–";
+      } else {
+        const acc = (stats.correct / stats.total) * 100;
+        statAccuracyEl.textContent = acc.toFixed(1) + " %";
+        statAccuracyEl.className = "stat-value " + (acc >= 80 ? "good" : "bad");
+        const avg = stats.sumTime / stats.total;
+        statAvgTimeEl.textContent = avg.toFixed(2) + " s";
+      }
+      statStreakEl.textContent = stats.streak;
+    }
+
+    function resetStats() {
+      stats = { total: 0, correct: 0, sumTime: 0, streak: 0 };
+      updateStatsUI();
+      feedbackEl.textContent = "";
+    }
+
+    function flashSequence(tokens) {
+      const flash = getFlashDuration();
+      const gap = getGapDuration();
+      let index = 0;
+
+      function step() {
+        if (!current) return;
+        if (index >= tokens.length) {
+          // Done flashing, go to answer phase
+          stimulusEl.textContent = "";
+          seqIndicatorEl.textContent = "";
+          startAnswerPhase();
+          return;
+        }
+
+        stimulusEl.textContent = tokens[index];
+        seqIndicatorEl.textContent = `Symbol ${index + 1} / ${tokens.length}`;
+
+        sequenceTimeout = setTimeout(() => {
+          // clear between flashes
+          stimulusEl.textContent = "";
+          seqIndicatorEl.textContent = `Symbol ${index + 1} / ${tokens.length}`;
+          sequenceTimeout = setTimeout(() => {
+            index += 1;
+            step();
+          }, gap);
+        }, flash);
+      }
+
+      step();
+    }
+
+    function startProblem() {
+      clearTimeout(sequenceTimeout);
+      clearTimeout(limitTimeout);
+      feedbackEl.textContent = "";
+      answerInput.value = "";
+      answerInput.disabled = true;
+      submitBtn.disabled = true;
+      skipBtn.disabled = true;
+
+      const numOps = parseInt(lengthSelect.value, 10);
+      const { tokens, result } = generateSequence(numOps);
+      current = { tokens, result };
+
+      questionTextEl.textContent = "Watch the entire chain. Nothing will stay on screen.";
+      stimulusEl.textContent = "";
+      seqIndicatorEl.textContent = "Get ready...";
+
+      setConfigEnabled(false);
+      startBtn.disabled = true;
+
+      // short delay before first flash
+      sequenceTimeout = setTimeout(() => {
+        flashSequence(tokens);
+      }, 400);
+    }
+
+    function startAnswerPhase() {
+      awaitingAnswer = true;
+      questionTextEl.textContent = "Compute the final result of the full chain.";
+      answerInput.placeholder = "Type the final answer";
+      answerInput.disabled = false;
+      submitBtn.disabled = false;
+      skipBtn.disabled = false;
+      answerInput.focus();
+      answerInput.select();
+
+      problemStartTime = performance.now();
+
+      const limitMs = getTimeLimit() * 1000;
+      limitTimeout = setTimeout(() => {
+        if (awaitingAnswer) {
+          handleAnswer(null, true);
+        }
+      }, limitMs);
+    }
+
+    function handleAnswer(raw, timedOut) {
+      if (!awaitingAnswer || !current) return;
+
+      clearTimeout(limitTimeout);
+
+      const endTime = performance.now();
+      const elapsed = (endTime - problemStartTime) / 1000;
+
+      stats.total += 1;
+
+      let correct = false;
+      const correctVal = current.result;
+      const userVal = raw === null ? null : parseInt(String(raw).trim(), 10);
+
+      if (!timedOut && !Number.isNaN(userVal)) {
+        correct = (userVal === correctVal);
+      }
+
+      if (correct) {
+        stats.correct += 1;
+        stats.sumTime += elapsed;
+        stats.streak += 1;
+        feedbackEl.textContent = `✔ Correct (${elapsed.toFixed(2)} s) | Chain was: ${current.tokens.join(" ")}`;
+        feedbackEl.className = "feedback correct";
+      } else {
+        stats.streak = 0;
+        if (timedOut) {
+          feedbackEl.textContent = `✖ Time up. Result = ${correctVal} | Chain was: ${current.tokens.join(" ")}`;
+        } else if (raw === "" || raw === null) {
+          feedbackEl.textContent = `✖ No answer. Result = ${correctVal} | Chain was: ${current.tokens.join(" ")}`;
+        } else if (Number.isNaN(userVal)) {
+          feedbackEl.textContent = `✖ "${raw}" is not a number. Result = ${correctVal} | Chain: ${current.tokens.join(" ")}`;
+        } else {
+          feedbackEl.textContent = `✖ ${userVal} is wrong. Result = ${correctVal} | Chain: ${current.tokens.join(" ")}`;
+        }
+        feedbackEl.className = "feedback incorrect";
+      }
+
+      updateStatsUI();
+
+      awaitingAnswer = false;
+      current = null;
+      stimulusEl.textContent = "";
+      seqIndicatorEl.textContent = "";
+
+      setConfigEnabled(true);
+      startBtn.disabled = false;
+      answerInput.disabled = true;
+      submitBtn.disabled = true;
+      skipBtn.disabled = true;
+
+      questionTextEl.textContent += "  Press Start for the next chain.";
+    }
+
+    // -------- Events --------
+    startBtn.addEventListener("click", startProblem);
+    submitBtn.addEventListener("click", () => handleAnswer(answerInput.value, false));
+    skipBtn.addEventListener("click", () => handleAnswer("", true));
+    resetBtn.addEventListener("click", resetStats);
+
+    answerInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        handleAnswer(answerInput.value, false);
+      }
+    });
+
+    window.addEventListener("keydown", (e) => {
+      if (e.code === "Space" && !awaitingAnswer && !current) {
+        e.preventDefault();
+        startProblem();
+      }
+    });
+
+    updateStatsUI();
+  </script>
+</body>
+</html>

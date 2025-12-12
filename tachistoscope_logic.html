@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Tachistoscope Logic Flash</title>
+  <style>
+    :root {
+      --bg: #050816;
+      --bg-card: #0b1020;
+      --accent: #4f46e5;
+      --accent-soft: rgba(79, 70, 229, 0.2);
+      --text-main: #e5e7eb;
+      --text-muted: #9ca3af;
+      --danger: #ef4444;
+      --success: #22c55e;
+    }
+
+    * {
+      box-sizing: border-box;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(circle at top, #1f2937 0, #020617 45%, #000 100%);
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .app {
+      width: 100%;
+      max-width: 900px;
+      background: linear-gradient(145deg, #020617, #020617 40%, #030712);
+      border-radius: 20px;
+      padding: 24px 28px 22px;
+      box-shadow:
+        0 24px 60px rgba(15, 23, 42, 0.8),
+        0 0 0 1px rgba(148, 163, 184, 0.2);
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .title {
+      font-size: 1.4rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .subtitle {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .pill {
+      font-size: 0.75rem;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--accent-soft);
+      background: rgba(15, 23, 42, 0.9);
+      color: var(--accent);
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(0, 2.1fr) minmax(0, 1.2fr);
+      gap: 18px;
+    }
+
+    @media (max-width: 800px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      border-radius: 16px;
+      padding: 18px 18px 16px;
+      background: radial-gradient(circle at top left, rgba(79, 70, 229, 0.16), transparent 60%),
+                  radial-gradient(circle at bottom right, rgba(6, 182, 212, 0.14), transparent 55%),
+                  var(--bg-card);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+    }
+
+    .display {
+      height: 190px;
+      border-radius: 14px;
+      background: radial-gradient(circle at top, rgba(248, 250, 252, 0.08), transparent 55%),
+                  #020617;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .fixation {
+      position: absolute;
+      width: 4px;
+      height: 4px;
+      border-radius: 999px;
+      background: rgba(148, 163, 184, 0.5);
+    }
+
+    .stimulus {
+      font-size: 2.1rem;
+      font-weight: 700;
+      text-align: center;
+      padding: 0 10px;
+      text-shadow: 0 0 18px rgba(15, 23, 42, 0.9);
+    }
+
+    .stimulus.logic-small {
+      font-size: 1.55rem;
+    }
+
+    .question {
+      margin-top: 12px;
+      min-height: 46px;
+      font-size: 0.98rem;
+      color: var(--text-main);
+    }
+
+    .question span.label {
+      color: var(--text-muted);
+      font-size: 0.86rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .controls-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border-radius: 999px;
+      border: none;
+      padding: 8px 16px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      background: linear-gradient(135deg, #4f46e5, #0ea5e9);
+      color: white;
+      box-shadow: 0 8px 18px rgba(59, 130, 246, 0.4);
+      transition: transform 0.08s ease, box-shadow 0.08s ease, opacity 0.08s ease;
+    }
+
+    button.secondary {
+      background: transparent;
+      border: 1px solid rgba(148, 163, 184, 0.7);
+      box-shadow: none;
+      color: var(--text-main);
+      padding-inline: 14px;
+    }
+
+    button:disabled {
+      opacity: 0.4;
+      cursor: default;
+      box-shadow: none;
+      transform: none;
+    }
+
+    button:not(:disabled):active {
+      transform: translateY(1px) scale(0.99);
+      box-shadow: 0 4px 10px rgba(59, 130, 246, 0.35);
+    }
+
+    .input-row {
+      display: flex;
+      margin-top: 8px;
+      gap: 8px;
+      align-items: center;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.7);
+      background: rgba(15, 23, 42, 0.9);
+      color: var(--text-main);
+      font-size: 0.95rem;
+      padding: 8px 12px;
+      outline: none;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.4);
+    }
+
+    label.control-label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    label.control-label input {
+      margin-top: 1px;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.6);
+      background: rgba(15, 23, 42, 0.9);
+      color: var(--text-main);
+      padding: 4px 8px;
+      font-size: 0.8rem;
+      width: 82px;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+      font-size: 0.83rem;
+    }
+
+    @media (max-width: 540px) {
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .stat {
+      border-radius: 12px;
+      padding: 8px 10px;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(55, 65, 81, 0.8);
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      margin-bottom: 3px;
+    }
+
+    .stat-value {
+      font-size: 0.98rem;
+      font-weight: 600;
+    }
+
+    .stat-value.good {
+      color: var(--success);
+    }
+
+    .stat-value.bad {
+      color: var(--danger);
+    }
+
+    .hint {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      border: 1px solid rgba(148, 163, 184, 0.7);
+      color: var(--text-muted);
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+
+    .feedback {
+      font-size: 0.9rem;
+      margin-top: 5px;
+    }
+
+    .feedback.correct {
+      color: var(--success);
+    }
+
+    .feedback.incorrect {
+      color: var(--danger);
+    }
+
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="header">
+      <div>
+        <div class="title">Tachistoscope Logic Flash</div>
+        <div class="subtitle">Flash-encode &amp; solve micro logic problems at high speed.</div>
+      </div>
+      <div class="pill">
+        <span style="opacity:.8;">Mode:</span> Logic&nbsp;&amp;&nbsp;Math
+      </div>
+    </div>
+
+    <div class="layout">
+      <!-- LEFT: main game -->
+      <div class="card">
+        <div class="display" id="display">
+          <div class="fixation"></div>
+          <div class="stimulus" id="stimulus"></div>
+        </div>
+
+        <div class="question" id="questionBox">
+          <span class="label">Prompt</span>
+          <span id="questionText">Press <b>Start</b> to flash a logic snippet. It will appear very briefly, then you'll answer from memory.</span>
+        </div>
+
+        <div class="input-row">
+          <input id="answerInput" type="text" placeholder="Type answer and hit Enter" autocomplete="off" disabled />
+          <button id="submitBtn" disabled>Submit</button>
+        </div>
+        <div class="feedback" id="feedback"></div>
+
+        <div class="controls-row" style="margin-top:12px;">
+          <button id="startBtn">Start</button>
+          <button id="skipBtn" class="secondary" disabled>Skip</button>
+          <span class="badge"><span class="dot"></span> Press <b>Enter</b> to submit faster</span>
+        </div>
+      </div>
+
+      <!-- RIGHT: settings + stats -->
+      <div class="card">
+        <div style="font-size:0.95rem; font-weight:600; margin-bottom:8px;">Session Settings</div>
+        <div class="controls-row">
+          <label class="control-label">
+            Flash (ms)
+            <input id="flashInput" type="number" value="220" min="80" max="1000" />
+          </label>
+          <label class="control-label">
+            Time limit (s)
+            <input id="limitInput" type="number" value="6" min="2" max="30" />
+          </label>
+          <label class="control-label">
+            Mode
+            <select id="modeSelect" style="border-radius:999px;border:1px solid rgba(148,163,184,.7);background:rgba(15,23,42,.9);color:var(--text-main);padding:4px 8px;font-size:0.8rem;">
+              <option value="mixed">Mixed</option>
+              <option value="logic">Logic only</option>
+              <option value="math">Math only</option>
+            </select>
+          </label>
+        </div>
+        <div class="hint">
+          Symbols: use <b>&gt;</b>, <b>&lt;</b>, <b>=</b>, <b>T/F</b> for booleans, or letters/numbers as shown. Answers are case-insensitive.
+        </div>
+
+        <div style="margin-top:14px;font-size:0.9rem;font-weight:600;">Stats (this session)</div>
+        <div class="stats-grid">
+          <div class="stat">
+            <div class="stat-label">Problems</div>
+            <div class="stat-value"><span id="statTotal">0</span> total</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Accuracy</div>
+            <div class="stat-value" id="statAccuracy">–</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Avg answer time</div>
+            <div class="stat-value" id="statAvgTime">–</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Streak</div>
+            <div class="stat-value" id="statStreak">0</div>
+          </div>
+        </div>
+
+        <button id="resetBtn" class="secondary" style="margin-top:12px;">Reset stats</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ---------- Problem generation --------------
+
+    function randomChoice(arr) {
+      return arr[Math.floor(Math.random() * arr.length)];
+    }
+
+    function makeComparisonProblem() {
+      // Always use A, B, C for clarity
+      const structure = randomChoice([
+        { text: "A > B, B > C, A ? C", answer: ">" },
+        { text: "A < B, B < C, A ? C", answer: "<" },
+        { text: "A > B, C < B, largest?", answer: "A" },
+        { text: "A < B, C > B, smallest?", answer: "A" },
+      ]);
+      return {
+        type: "logic",
+        stimulus: structure.text,
+        question: "Fill in the relation or choose the correct letter.",
+        answer: structure.answer.toLowerCase(),
+        hint: "Use >, <, or the letter (A/B/C)."
+      };
+    }
+
+    function makeBooleanProblem() {
+      const variant = randomChoice([0, 1, 2]);
+      if (variant === 0) {
+        return {
+          type: "logic",
+          stimulus: "A true, B false → A AND B ?",
+          question: "Type T or F.",
+          answer: "f",
+          hint: "AND is true only if both are true."
+        };
+      } else if (variant === 1) {
+        return {
+          type: "logic",
+          stimulus: "A false, B true → A OR B ?",
+          question: "Type T or F.",
+          answer: "t",
+          hint: "OR is true if at least one is true."
+        };
+      } else {
+        return {
+          type: "logic",
+          stimulus: "A true, B false → A XOR B ?",
+          question: "Type T or F.",
+          answer: "t",
+          hint: "XOR is true when exactly one is true."
+        };
+      }
+    }
+
+    function makeOrderProblem() {
+      // Simple 3-item ordering
+      const variant = randomChoice([0, 1]);
+      if (variant === 0) {
+        return {
+          type: "logic",
+          stimulus: "Left of B is A, right of B is C.",
+          question: "Who is in the middle (A/B/C)?",
+          answer: "b",
+          hint: "Visualize A-B-C."
+        };
+      } else {
+        return {
+          type: "logic",
+          stimulus: "C left of B, A right of B.",
+          question: "Leftmost (A/B/C)?",
+          answer: "c",
+          hint: "Left to right: C-B-A."
+        };
+      }
+    }
+
+    function makeMathProblem() {
+      const kind = randomChoice(["addmul", "muladd", "divide"]);
+      if (kind === "addmul") {
+        const a = randomInt(3, 9);
+        const b = randomInt(3, 9);
+        const c = randomInt(2, 9);
+        const stimulus = `${a} + ${b}×${c} = ?`;
+        const ans = a + b * c;
+        return {
+          type: "math",
+          stimulus,
+          question: "Compute the value.",
+          answer: String(ans),
+          hint: "Follow order of operations: multiply first."
+        };
+      } else if (kind === "muladd") {
+        const a = randomInt(4, 12);
+        const b = randomInt(3, 9);
+        const c = randomInt(2, 8);
+        const stimulus = `${a}×${b} + ${c} = ?`;
+        const ans = a * b + c;
+        return {
+          type: "math",
+          stimulus,
+          question: "Compute the value.",
+          answer: String(ans),
+          hint: "Do the multiplication then add."
+        };
+      } else {
+        // clean division
+        const divisor = randomChoice([3, 4, 5, 6, 8, 9]);
+        const base = randomInt(2, 20);
+        const result = base;
+        const dividend = base * divisor;
+        const stimulus = `${dividend} ÷ ${divisor} = ?`;
+        return {
+          type: "math",
+          stimulus,
+          question: "Compute the value.",
+          answer: String(result),
+          hint: "Use your fast division tricks."
+        };
+      }
+    }
+
+    function randomInt(min, max) {
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function makeProblem(mode) {
+      const generatorsLogic = [makeComparisonProblem, makeBooleanProblem, makeOrderProblem];
+      const generatorsMath  = [makeMathProblem];
+      let allGens;
+      if (mode === "logic") {
+        allGens = generatorsLogic;
+      } else if (mode === "math") {
+        allGens = generatorsMath;
+      } else {
+        allGens = generatorsLogic.concat(generatorsMath);
+      }
+      const gen = randomChoice(allGens);
+      return gen();
+    }
+
+    // ---------- Game state & logic --------------
+
+    const stimulusEl = document.getElementById("stimulus");
+    const displayEl = document.getElementById("display");
+    const questionTextEl = document.getElementById("questionText");
+    const answerInput = document.getElementById("answerInput");
+    const feedbackEl = document.getElementById("feedback");
+
+    const startBtn = document.getElementById("startBtn");
+    const submitBtn = document.getElementById("submitBtn");
+    const skipBtn = document.getElementById("skipBtn");
+    const flashInput = document.getElementById("flashInput");
+    const limitInput = document.getElementById("limitInput");
+    const modeSelect = document.getElementById("modeSelect");
+    const resetBtn = document.getElementById("resetBtn");
+
+    const statTotalEl = document.getElementById("statTotal");
+    const statAccuracyEl = document.getElementById("statAccuracy");
+    const statAvgTimeEl = document.getElementById("statAvgTime");
+    const statStreakEl = document.getElementById("statStreak");
+
+    let currentProblem = null;
+    let showingStimulus = false;
+    let awaitingAnswer = false;
+    let flashTimeout = null;
+    let limitTimeout = null;
+    let problemStartTime = null;
+
+    let stats = {
+      total: 0,
+      correct: 0,
+      sumTime: 0,
+      streak: 0
+    };
+
+    function updateStatsUI() {
+      statTotalEl.textContent = stats.total;
+      if (stats.total === 0) {
+        statAccuracyEl.textContent = "–";
+        statAccuracyEl.className = "stat-value";
+        statAvgTimeEl.textContent = "–";
+      } else {
+        const acc = (stats.correct / stats.total) * 100;
+        statAccuracyEl.textContent = acc.toFixed(1) + " %";
+        statAccuracyEl.className = "stat-value " + (acc >= 80 ? "good" : "bad");
+        const avg = stats.sumTime / stats.total;
+        statAvgTimeEl.textContent = avg.toFixed(2) + " s";
+      }
+      statStreakEl.textContent = stats.streak;
+    }
+
+    function resetStats() {
+      stats = { total: 0, correct: 0, sumTime: 0, streak: 0 };
+      updateStatsUI();
+      feedbackEl.textContent = "";
+    }
+
+    function getFlashDuration() {
+      let v = parseInt(flashInput.value, 10);
+      if (isNaN(v) || v < 80) v = 80;
+      if (v > 1000) v = 1000;
+      return v;
+    }
+
+    function getTimeLimit() {
+      let v = parseFloat(limitInput.value);
+      if (isNaN(v) || v < 2) v = 2;
+      if (v > 30) v = 30;
+      return v;
+    }
+
+    function setControlsEnabled(enabled) {
+      startBtn.disabled = !enabled && !awaitingAnswer;
+      flashInput.disabled = !enabled && awaitingAnswer;
+      limitInput.disabled = !enabled && awaitingAnswer;
+      modeSelect.disabled = !enabled && awaitingAnswer;
+    }
+
+    function startProblem() {
+      clearTimeout(flashTimeout);
+      clearTimeout(limitTimeout);
+      feedbackEl.textContent = "";
+      answerInput.value = "";
+      answerInput.disabled = true;
+      submitBtn.disabled = true;
+      skipBtn.disabled = true;
+
+      const mode = modeSelect.value;
+      currentProblem = makeProblem(mode);
+
+      // style logic vs math size
+      if (currentProblem.type === "logic") {
+        stimulusEl.classList.add("logic-small");
+      } else {
+        stimulusEl.classList.remove("logic-small");
+      }
+
+      stimulusEl.textContent = currentProblem.stimulus;
+      showingStimulus = true;
+      awaitingAnswer = false;
+
+      const flashDuration = getFlashDuration();
+
+      flashTimeout = setTimeout(() => {
+        // Hide stimulus -> show question
+        stimulusEl.textContent = "";
+        showingStimulus = false;
+        awaitingAnswer = true;
+        questionTextEl.textContent = currentProblem.question;
+        answerInput.placeholder = currentProblem.hint || "Type answer";
+        answerInput.disabled = false;
+        submitBtn.disabled = false;
+        skipBtn.disabled = false;
+        answerInput.focus();
+        answerInput.select();
+        problemStartTime = performance.now();
+
+        const limitMs = getTimeLimit() * 1000;
+        limitTimeout = setTimeout(() => {
+          if (awaitingAnswer) {
+            handleAnswer(null, true); // timed out
+          }
+        }, limitMs);
+      }, flashDuration);
+
+      // subtle question text while stimulus visible
+      questionTextEl.textContent = "⚡ Look at the center. The snippet will flash briefly.";
+      setControlsEnabled(false);
+    }
+
+    function normalizeAnswer(str) {
+      if (str == null) return "";
+      return str.trim().toLowerCase();
+    }
+
+    function handleAnswer(raw, timedOut = false) {
+      if (!awaitingAnswer || !currentProblem) return;
+
+      clearTimeout(limitTimeout);
+
+      const endTime = performance.now();
+      const elapsedSec = problemStartTime ? (endTime - problemStartTime) / 1000 : 0;
+      const userAns = normalizeAnswer(raw);
+
+      stats.total += 1;
+      let correct = false;
+
+      if (!timedOut) {
+        const correctAns = normalizeAnswer(currentProblem.answer);
+
+        // some flexibility: t/f, true/false
+        const mappedUser = userAns === "true" ? "t" :
+                           userAns === "false" ? "f" : userAns;
+        const mappedCorrect = correctAns === "true" ? "t" :
+                              correctAns === "false" ? "f" : correctAns;
+
+        correct = mappedUser === mappedCorrect;
+      }
+
+      if (correct) {
+        stats.correct += 1;
+        stats.sumTime += elapsedSec;
+        stats.streak += 1;
+        feedbackEl.textContent = `✔ Correct (${elapsedSec.toFixed(2)} s)`;
+        feedbackEl.className = "feedback correct";
+      } else {
+        stats.streak = 0;
+        if (timedOut) {
+          feedbackEl.textContent = `✖ Time up. Correct: ${currentProblem.answer}`;
+        } else if (userAns === "") {
+          feedbackEl.textContent = `✖ No answer. Correct: ${currentProblem.answer}`;
+        } else {
+          feedbackEl.textContent = `✖ ${raw} is wrong. Correct: ${currentProblem.answer}`;
+        }
+        feedbackEl.className = "feedback incorrect";
+      }
+
+      updateStatsUI();
+
+      awaitingAnswer = false;
+      currentProblem = null;
+      setControlsEnabled(true);
+      startBtn.disabled = false;
+      answerInput.disabled = true;
+      submitBtn.disabled = true;
+      skipBtn.disabled = true;
+      questionTextEl.textContent += "  Press Start for the next flash.";
+    }
+
+    // ---------- Event wiring --------------
+
+    startBtn.addEventListener("click", () => {
+      startProblem();
+    });
+
+    submitBtn.addEventListener("click", () => {
+      handleAnswer(answerInput.value, false);
+    });
+
+    skipBtn.addEventListener("click", () => {
+      handleAnswer("", true);
+    });
+
+    resetBtn.addEventListener("click", resetStats);
+
+    answerInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        handleAnswer(answerInput.value, false);
+      }
+    });
+
+    // Small keybinding: space starts next problem if not answering
+    window.addEventListener("keydown", (e) => {
+      if (e.code === "Space" && !awaitingAnswer && !showingStimulus) {
+        e.preventDefault();
+        startProblem();
+      }
+    });
+
+    updateStatsUI();
+  </script>
+</body>
+</html>

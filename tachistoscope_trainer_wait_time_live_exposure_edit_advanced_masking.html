@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Tachistoscope Trainer — Advanced</title>
+<style>
+  :root{
+    --bg:#0b0d10; --panel:#151922; --accent:#6ae3ff; --text:#e9eef7; --muted:#9fb0c7; --bad:#ff6b6b; --good:#4ade80;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,"Helvetica Neue",Arial; background:linear-gradient(180deg,#0a0c10 0%, #0b0d10 100%); color:var(--text); min-height:100svh; display:flex; flex-direction:column}
+  header{padding:16px; display:flex; align-items:center; gap:12px; border-bottom:1px solid #1e2430; background:#0b0d10d0; backdrop-filter: blur(6px); position:sticky; top:0; z-index:10}
+  header h1{font-size:18px; margin:0; letter-spacing:.4px}
+  .wrap{display:grid; grid-template-columns: 340px 1fr; gap:16px; padding:16px; flex:1}
+  @media (max-width: 900px){ .wrap{grid-template-columns: 1fr} }
+  .card{background:var(--panel); border:1px solid #202838; border-radius:12px; padding:14px; box-shadow:0 8px 24px rgba(0,0,0,.25)}
+  fieldset{border:1px solid #263044; border-radius:10px; margin:0 0 12px 0; padding:10px 10px 6px}
+  legend{padding:0 6px; color:var(--muted); font-size:12px; letter-spacing:.3px}
+  label{display:flex; align-items:center; justify-content:space-between; gap:10px; margin:8px 0; font-size:14px}
+  input[type="number"],select{width:120px; background:#0f1420; border:1px solid #263044; color:var(--text); padding:6px 8px; border-radius:8px}
+  input[type="range"]{width:100%}
+  .row{display:flex; gap:8px; flex-wrap:wrap}
+  button{background:#1a2232; color:var(--text); border:1px solid #2b354b; padding:10px 12px; border-radius:10px; cursor:pointer}
+  button.primary{background:var(--accent); color:#001018; border-color:#7df0ff; font-weight:700}
+  button:disabled{opacity:.6; cursor:not-allowed}
+  .stage{display:grid; place-items:center; min-height:420px; background:#03050a; border:1px dashed #263044; border-radius:12px; position:relative; overflow:hidden}
+  #stimulus{font-variant-numeric: tabular-nums lining-nums; letter-spacing:.06em; font-size: clamp(32px, 9vw, 96px); font-weight:800; text-shadow: 0 2px 24px rgba(0,0,0,.45); user-select:none}
+  #maskLayer{position:absolute; inset:0; display:none; align-items:center; justify-content:center}
+  #maskLayer span{opacity:.25; font-family:monospace}
+  #prompt{display:none; width:min(640px, 90%); margin:auto; text-align:center}
+  #response{width:100%; font-size:20px; padding:10px 12px; border-radius:10px; background:#0f1420; border:1px solid #263044; color:var(--text); letter-spacing:.06em; text-align:center}
+  .stats{display:grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap:10px}
+  .pill{background:#0f1420; border:1px solid #263044; padding:10px; border-radius:10px; text-align:center}
+  .big{font-size:22px; font-weight:800}
+  .ok{color:var(--good)} .bad{color:var(--bad)} .muted{color:var(--muted)}
+  table{width:100%; border-collapse:collapse; font-size:13px}
+  th,td{border-bottom:1px solid #223045; padding:6px 4px; text-align:center}
+  .hint{font-size:12px; color:var(--muted)}
+  footer{padding:10px 16px; color:var(--muted); font-size:12px; text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <h1>⚡ Tachistoscope Trainer — Advanced</h1>
+  <div class="hint">Space = next • Enter = submit • Esc = pause</div>
+</header>
+
+<div class="wrap">
+  <!-- Controls -->
+  <div class="card" id="controls">
+    <fieldset>
+      <legend>Session</legend>
+      <label>Rounds <input id="rounds" type="number" min="1" value="20"></label>
+      <label>Mode
+        <select id="mode">
+          <option value="digits" selected>Digits (0–9)</option>
+          <option value="letters">Letters (A–Z)</option>
+          <option value="mixed">Mixed (0–9 + A–Z)</option>
+          <option value="symbols">Symbols (!@#%&*?)</option>
+        </select>
+      </label>
+      <label>Length (chars) <input id="len" type="number" min="2" max="12" value="5"></label>
+      <label>Unique chars only?
+        <select id="unique">
+          <option value="no" selected>No</option>
+          <option value="yes">Yes</option>
+        </select>
+      </label>
+      <label>Grouping (spaces every) <input id="groupN" type="number" min="0" value="0"></label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Timing</legend>
+      <label>Exposure (ms) <input id="exposure" type="number" min="20" step="5" value="100"></label>
+      <label>± Jitter (ms) <input id="jitter" type="number" min="0" step="5" value="0"></label>
+      <label>Pre-wait / Fixation (ms) <input id="wait" type="number" min="0" step="10" value="0"></label>
+      <label>Show fixation cross?
+        <select id="fixation">
+          <option value="no" selected>No</option>
+          <option value="yes">Yes</option>
+        </select>
+      </label>
+      <label>Inter-stimulus interval (ms) <input id="isi" type="number" min="0" step="10" value="400"></label>
+      <label>Countdown (s) <input id="countdown" type="number" min="0" value="1"></label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Masking — Pre (forward)</legend>
+      <label>Pre-mask type
+        <select id="preMaskType">
+          <option value="none" selected>None</option>
+          <option value="hash">##### overlay</option>
+          <option value="noise">Visual noise</option>
+          <option value="blank">Blank</option>
+        </select>
+      </label>
+      <label>Pre-mask duration (ms) <input id="preMaskDur" type="number" min="0" step="10" value="0"></label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Masking — Post (backward)</legend>
+      <label>Post-mask type
+        <select id="postMaskType">
+          <option value="none" selected>None</option>
+          <option value="hash">##### overlay</option>
+          <option value="noise">Visual noise</option>
+          <option value="blank">Blank</option>
+        </select>
+      </label>
+      <label>Post-mask duration (ms) <input id="postMaskDur" type="number" min="0" step="10" value="0"></label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Rules</legend>
+      <label>Scoring
+        <select id="scoring">
+          <option value="exact" selected>Exact match required</option>
+          <option value="lev">Levenshtein ≥ (len−1)</option>
+        </select>
+      </label>
+      <label>Mode
+        <select id="gameMode">
+          <option value="standard" selected>Standard (best of N)</option>
+          <option value="endurance">Endurance (no limit)</option>
+          <option value="sudden">Sudden death (1 miss = end)</option>
+        </select>
+      </label>
+    </fieldset>
+
+    <div class="row">
+      <button id="start" class="primary">Start</button>
+      <button id="pause">Pause</button>
+      <button id="reset">Reset</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button id="exportCsv">Export CSV</button>
+      <button id="clearHistory">Clear History</button>
+    </div>
+    <p class="hint" style="margin-top:6px">Edit <b>Exposure/Masking/Wait</b> live during a session — changes apply to the next round.</p>
+  </div>
+
+  <!-- Stage + Stats -->
+  <div class="card">
+    <div class="stage" id="stage">
+      <div id="stimulus" aria-live="polite"></div>
+      <div id="maskLayer"><span>#####</span></div>
+      <div id="prompt">
+        <input id="response" placeholder="Type what you saw…" autocomplete="off" />
+        <div id="feedback" class="hint" style="margin-top:6px"></div>
+        <div class="row" style="justify-content:center; margin-top:8px">
+          <button id="submit" class="primary">Submit (Enter)</button>
+          <button id="skip">Skip</button>
+          <button id="next">Next (Space)</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="stats" style="margin-top:12px">
+      <div class="pill"><div class="muted">Round</div><div class="big" id="statRound">0/0</div></div>
+      <div class="pill"><div class="muted">Accuracy</div><div class="big" id="statAcc">—</div></div>
+      <div class="pill"><div class="muted">Streak</div><div class="big" id="statStreak">0</div></div>
+      <div class="pill"><div class="muted">Avg RT</div><div class="big" id="statRT">—</div></div>
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <div class="row" style="justify-content:space-between; align-items:center">
+        <div class="muted">Session Log</div>
+        <div class="hint">Green = correct • Red = wrong (click a row to copy)</div>
+      </div>
+      <div style="overflow:auto; max-height:260px; margin-top:8px">
+        <table id="log">
+          <thead><tr><th>#</th><th>Target</th><th>Your Input</th><th>Result</th><th>RT (ms)</th><th>Exposure</th><th>Len</th><th>Mode</th><th>Time</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<footer>© Tachistoscope Trainer — local only; no data leaves your browser. History persists in localStorage.</footer>
+
+<script>
+(function(){
+  const $ = sel => document.querySelector(sel);
+  const pad2 = n => String(n).padStart(2,'0');
+  const nowISO = ()=>{const d=new Date(); return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`};
+  const rand = (n)=>Math.floor(Math.random()*n);
+  const shuffle = arr => {for(let i=arr.length-1;i>0;i--){const j=rand(i+1); [arr[i],arr[j]]=[arr[j],arr[i]]} return arr};
+  const levenshtein = (a,b)=>{const m=a.length,n=b.length; const dp=new Array(n+1).fill(0).map((_,i)=>i); for(let i=1;i<=m;i++){ let prev=dp[0]++; for(let j=1;j<=n;j++){ const tmp=dp[j]; dp[j]= Math.min(dp[j]+1, dp[j-1]+1, prev + (a[i-1]===b[j-1]?0:1)); prev=tmp; }} return dp[n]; };
+
+  const el = {
+    stimulus: $('#stimulus'),
+    maskLayer: $('#maskLayer'),
+    maskSpan: $('#maskLayer span'),
+    prompt: $('#prompt'), response: $('#response'), feedback: $('#feedback'), submit: $('#submit'), skip: $('#skip'), next: $('#next'),
+    start: $('#start'), pause: $('#pause'), reset: $('#reset'), exportCsv: $('#exportCsv'), clearHistory: $('#clearHistory'),
+    logBody: $('#log tbody'), statRound: $('#statRound'), statAcc: $('#statAcc'), statStreak: $('#statStreak'), statRT: $('#statRT'),
+    rounds: $('#rounds'), mode: $('#mode'), len: $('#len'), exposure: $('#exposure'), jitter: $('#jitter'), isi: $('#isi'), countdown: $('#countdown'),
+    preMaskType: $('#preMaskType'), preMaskDur: $('#preMaskDur'), postMaskType: $('#postMaskType'), postMaskDur: $('#postMaskDur'),
+    scoring: $('#scoring'), gameMode: $('#gameMode'), unique: $('#unique'), groupN: $('#groupN'), wait: $('#wait'), fixation: $('#fixation')
+  };
+
+  let state = { running:false, paused:false, round:0, total:0, correct:0, streak:0, target:"", startTs:0, lastRt:0, history: JSON.parse(localStorage.getItem('tachi_history')||'[]'), sessionRows: [] };
+
+  const SETS = { digits:'0123456789', letters:'ABCDEFGHIJKLMNOPQRSTUVWXYZ', mixed:'0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ', symbols:'!@#%&*?' };
+
+  function sampleString(set, len, unique=false){ if(unique){ let arr = shuffle(set.split('')); return arr.slice(0, len).join(''); } else { let out=''; for(let i=0;i<len;i++) out += set[rand(set.length)]; return out; } }
+  function applyGrouping(str, n){ if(!n || n<=0) return str; let out=[]; for(let i=0;i<str.length;i+=n){ out.push(str.slice(i,i+n)); } return out.join(' '); }
+
+  let timers = new Set();
+  const clearTimers = ()=>{ timers.forEach(id=>clearTimeout(id)); timers.clear(); };
+
+  function countdown(sec){ return new Promise(res=>{ if(sec<=0){ res(); return; } let c=sec; el.stimulus.textContent = c; el.prompt.style.display='none'; const tick = ()=>{ if(!state.running) return; if(c<=0){ el.stimulus.textContent=''; res(); return; } el.stimulus.textContent = c; c--; const id=setTimeout(tick,1000); timers.add(id); }; const id=setTimeout(tick,0); timers.add(id); }); }
+
+  async function runRound(){
+    state.round++; updateStats(); const opts = readOptions(); const set = SETS[opts.mode]; state.target = sampleString(set, opts.len, opts.unique==='yes'); const shown = applyGrouping(state.target, opts.groupN);
+
+    // Pre-mask (forward masking) if any
+    await countdown(opts.countdown);
+
+    if(opts.wait>0){
+      if(opts.fixation==='yes'){ el.stimulus.textContent = '+'; } else { el.stimulus.textContent=''; }
+      await new Promise(res=>{ const id=setTimeout(res, opts.wait); timers.add(id); });
+      el.stimulus.textContent='';
+    }
+
+    if(opts.preMaskType!=="none" && opts.preMaskDur>0){
+      setupMask(opts.preMaskType, shown.length); showMask(true);
+      await new Promise(res=>{ const id=setTimeout(()=>{ showMask(false); res(); }, opts.preMaskDur); timers.add(id); });
+    }
+
+    // Stimulus
+    el.prompt.style.display='none'; el.stimulus.style.opacity='1'; el.stimulus.textContent = shown; state.startTs = performance.now();
+
+    const exp = applyJitter(opts.exposure, opts.jitter);
+    await new Promise(res=>{ const id=setTimeout(res, exp); timers.add(id); });
+    el.stimulus.textContent='';
+
+    // Post-mask (backward masking)
+    if(opts.postMaskType!=="none" && opts.postMaskDur>0){
+      setupMask(opts.postMaskType, shown.length); showMask(true);
+      await new Promise(res=>{ const id=setTimeout(()=>{ showMask(false); afterStimulus(); res(); }, opts.postMaskDur); timers.add(id); });
+    } else {
+      afterStimulus();
+    }
+  }
+
+  function applyJitter(base, jit){ if(!jit) return base; const delta = (Math.random()*2-1)*jit; return Math.max(0, Math.round(base + delta)); }
+
+  function setupMask(type, len){
+    const layer = el.maskLayer; const span = el.maskSpan; layer.style.background = '#0d1117'; span.style.display='none';
+    if(type==='blank'){ layer.style.background = '#000'; }
+    else if(type==='hash'){ span.style.display='block'; span.textContent = '#'.repeat(Math.max(5, len)); }
+    else if(type==='noise'){
+      layer.style.background = `repeating-linear-gradient(45deg,#0d1117,#0d1117 2px,#0f1320 2px,#0f1320 4px)`;
+    }
+  }
+  function showMask(show){ el.maskLayer.style.display = show ? 'flex' : 'none'; }
+
+  function afterStimulus(){ const opts = readOptions(); const showPrompt = ()=>{ el.prompt.style.display='block'; el.response.value=''; el.response.focus(); el.feedback.textContent=''; };
+    if(opts.isi>0){ const id=setTimeout(showPrompt, opts.isi); timers.add(id); } else { showPrompt(); } }
+
+  function evaluate(){ const opts = readOptions(); const input = (el.response.value||'').replace(/\s+/g,'').toUpperCase(); const target = state.target.toUpperCase(); state.lastRt = Math.max(0, Math.round(performance.now() - state.startTs - opts.exposure - opts.isi)); let ok=false, distance=0;
+    if(opts.scoring==='exact'){ ok = input===target; } else { distance = levenshtein(input, target); const thresh = Math.max(0, target.length-1); ok = (input.length===target.length) && (distance<=1) && (target.length>=3); if(target.length<3) ok=(input===target); }
+    state.total++; if(ok){ state.correct++; state.streak++; } else { state.streak=0; }
+    el.feedback.innerHTML = ok? `<span class="ok">✔ Correct</span> — <span class="muted">Target:</span> ${target}` : `<span class="bad">✘</span> <span class="muted">Target:</span> ${target}`;
+    const row = { n: state.total, target, input, ok, rt: state.lastRt, exposure: opts.exposure, len: opts.len, mode: opts.mode, ts: nowISO() };
+    state.sessionRows.push(row); appendLogRow(row); updateStats();
+    if(opts.gameMode==='sudden' && !ok){ finishSession('Miss in sudden-death.'); return; }
+    if(opts.gameMode==='standard'){ if(state.round >= opts.rounds){ finishSession('Session complete.'); return; } }
+    el.next.disabled=false; el.submit.disabled=true; }
+
+  function nextRound(){ const opts = readOptions(); el.next.disabled=true; el.submit.disabled=false; el.feedback.textContent=''; if(!state.running) return; if(opts.gameMode==='standard' && state.round>=opts.rounds){ finishSession('Session complete.'); return; } runRound(); }
+
+  function updateStats(){ const acc = state.total ? Math.round(100*state.correct/state.total) : null; el.statRound.textContent = `${state.round}/${readOptions().gameMode==='standard' ? readOptions().rounds : '∞'}`; el.statAcc.textContent = acc==null ? '—' : acc+'%'; el.statStreak.textContent = String(state.streak); el.statRT.textContent = state.lastRt ? state.lastRt+' ms' : '—'; }
+
+  function appendLogRow(row){ const tr=document.createElement('tr'); tr.style.background = row.ok ? 'rgba(0,255,0,0.05)' : 'rgba(255,0,0,0.05)'; tr.innerHTML = `<td>${row.n}</td><td><b>${row.target}</b></td><td>${row.input||'—'}</td><td>${row.ok?'✔':'✘'}</td><td>${row.rt}</td><td>${row.exposure}</td><td>${row.len}</td><td>${row.mode}</td><td>${row.ts}</td>`; tr.addEventListener('click', ()=>{ navigator.clipboard?.writeText(`${row.target}`).catch(()=>{}); }); el.logBody.prepend(tr); }
+
+  function readOptions(){ return { rounds: clampInt(el.rounds.value,1,10000), mode: el.mode.value, len: clampInt(el.len.value,2,12), exposure: clampInt(el.exposure.value, 10, 5000), jitter: clampInt(el.jitter.value,0,1000), isi: clampInt(el.isi.value, 0, 5000), countdown: clampInt(el.countdown.value,0,5), preMaskType: el.preMaskType.value, preMaskDur: clampInt(el.preMaskDur.value, 0, 3000), postMaskType: el.postMaskType.value, postMaskDur: clampInt(el.postMaskDur.value, 0, 3000), scoring: el.scoring.value, gameMode: el.gameMode.value, unique: el.unique.value, groupN: clampInt(el.groupN.value,0,6), wait: clampInt(el.wait.value,0,3000), fixation: el.fixation.value }; }
+  function clampInt(v,min,max){ v=parseInt(v||0,10); if(isNaN(v)) v=min; return Math.max(min, Math.min(max, v)); }
+
+  function startSession(){ if(state.running){ return; } clearTimers(); resetSession(false); state.running=true; state.paused=false; toggleControls(true); runRound(); }
+  function pauseSession(){ if(!state.running) return; state.paused = !state.paused; if(state.paused){ clearTimers(); el.pause.textContent='Resume'; } else { el.pause.textContent='Pause'; nextRound(); } }
+
+  function finishSession(reason){ state.running=false; toggleControls(false); if(state.sessionRows.length){ state.history.push({ at: nowISO(), opts: readOptions(), rows: state.sessionRows, summary: { total: state.total, correct: state.correct, acc: state.total ? +(100*state.correct/state.total).toFixed(1) : 0 } }); localStorage.setItem('tachi_history', JSON.stringify(state.history)); } el.feedback.innerHTML = `<span class="muted">${reason}</span>  Accuracy: <b>${state.total?Math.round(100*state.correct/state.total):0}%</b>`; }
+
+  function resetSession(clearLog=true){ clearTimers(); state.round=0; state.total=0; state.correct=0; state.streak=0; state.target=''; state.lastRt=0; state.sessionRows=[]; el.stimulus.textContent=''; showMask(false); el.prompt.style.display='none'; el.response.value=''; el.feedback.textContent=''; if(clearLog) el.logBody.innerHTML=''; updateStats(); el.pause.textContent='Pause'; }
+
+  function toggleControls(running){ const inputs = document.querySelectorAll('#controls input, #controls select'); inputs.forEach(i=> i.disabled = running); // allow live-edit for timing/masks
+    ['#exposure','#jitter','#preMaskType','#preMaskDur','#postMaskType','#postMaskDur','#wait','#fixation'].forEach(sel=>{ const node=document.querySelector(sel); if(node) node.disabled=false; }); el.start.disabled = running; el.pause.disabled = !running; el.reset.disabled = !running; }
+
+  function exportCSV(){ const rows=[]; rows.push(['timestamp','mode','len','exposure','isi','wait','preMask','preDur','postMask','postDur','gameMode','round','target','input','correct','rt_ms'].join(',')); state.history.forEach(sess=>{ const base=[sess.at, sess.opts.mode, sess.opts.len, sess.opts.exposure, sess.opts.isi, sess.opts.wait, `${sess.opts.preMaskType}`, sess.opts.preMaskDur, `${sess.opts.postMaskType}`, sess.opts.postMaskDur, sess.opts.gameMode]; sess.rows.forEach((r,i)=>{ rows.push([...base, i+1, r.target, r.input, r.ok?'1':'0', r.rt].join(',')); }); }); const blob=new Blob([rows.join('\n')], {type:'text/csv'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='tachistoscope_history.csv'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url); }
+
+  function clearHistory(){ if(confirm('Clear saved history?')){ localStorage.removeItem('tachi_history'); state.history=[]; alert('History cleared.'); } }
+
+  el.start.addEventListener('click', startSession); el.pause.addEventListener('click', pauseSession); el.reset.addEventListener('click', ()=>{ resetSession(true); toggleControls(false); state.running=false; }); el.submit.addEventListener('click', evaluate); el.next.addEventListener('click', nextRound); el.skip.addEventListener('click', ()=>{ state.total++; state.streak=0; const row={ n:state.total, target:state.target, input:'(skip)', ok:false, rt:state.lastRt, exposure:readOptions().exposure, len:readOptions().len, mode:readOptions().mode, ts:nowISO() }; state.sessionRows.push(row); appendLogRow(row); updateStats(); nextRound(); }); el.exportCsv.addEventListener('click', exportCSV); el.clearHistory.addEventListener('click', clearHistory);
+
+  window.addEventListener('keydown', (e)=>{ if(e.key===' ' && !['INPUT','TEXTAREA'].includes(document.activeElement.tagName)){ e.preventDefault(); if(state.running && el.prompt.style.display==='block'){ nextRound(); } } if(e.key==='Enter' && el.prompt.style.display==='block'){ e.preventDefault(); evaluate(); } if(e.key==='Escape'){ pauseSession(); } });
+
+  toggleControls(false);
+})();
+</script>
+</body>
+</html>
